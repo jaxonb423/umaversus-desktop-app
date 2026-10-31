@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "Uma Versus mods",
+  "mods": [
+    {
+      "id": "fuku",
+      "name": "Matikanefukukitaru",
+      "version": "1.0.0",
+      "author": "jaxonb423",
+      "kind": "fighter",
+      "build": "48dacc",
+      "description": "Fortune-teller runner: Dice Shot, Spirit Spin, Charm Tackle and the Omikuji gamble -- divine lightning, Fate Swap, curses and all.",
+      "tags": [
+        "fighter",
+        "gamble",
+        "omikuji",
+        "party-dash"
+      ],
+      "url": "mods/fuku/fuku.uvmod.js",
+      "homepage": "https://github.com/jaxonb423/umaversus-mods/tree/main/mods/fuku",
+      "size": "574 KB",
+      "icon": "mods/fuku/icon.png",
+      "banner": "mods/fuku/banner.png"
+    },
+    {
+      "id": "nixon",
+      "name": "Nixon (Electoral Carnage)",
+      "version": "5.1.0",
+      "author": "jaxonb423",
+      "kind": "fighter",
+      "build": "48dacc",
+      "description": "Richard Nixon with his full Electoral Carnage kit: stars, lightning, slam, float, Dream Stones and the Not A Crook super. Carnage rules, 12-hit health.",
+      "tags": [
+        "fighter",
+        "carnage",
+        "electoral-carnage",
+        "nixon"
+      ],
+      "url": "mods/nixon/nixon.uvmod.js",
+      "homepage": "https://github.com/jaxonb423/umaversus-mods/tree/main/mods/nixon",
+      "size": "2.2 MB",
+      "icon": "mods/nixon/icon.png",
+      "banner": "mods/nixon/banner.png"
+    }
+  ]
+}
