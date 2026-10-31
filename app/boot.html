@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Uma Versus (Modded)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #170c28; color: #efe8fb; font: 600 17px "Segoe UI", Arial, sans-serif; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(1200px 600px at 70% 120%, #ff4f8b33, transparent), linear-gradient(160deg, #1e1038, #170c28 60%); }
+  .stripes { position: fixed; inset: 0; pointer-events: none; opacity: .5;
+    background: linear-gradient(115deg, transparent 62%, #ff4f8b 62% 66%, transparent 66% 69%, #f6c343 69% 71%, transparent 71% 73%, #4aa8ff 73% 75%, transparent 75%); }
+  .box { position: relative; width: min(620px, 90vw); padding: 26px 30px 22px; background: rgba(34,17,60,.92); border: 1.5px solid rgba(255,255,255,.16); border-radius: 12px; }
+  .box::before { content: ""; position: absolute; left: 16px; right: 16px; top: -2px; height: 4px; border-radius: 2px; background: #ff4f8b; }
+  h1 { margin: 0 0 2px; font: italic 900 38px "Arial Black", Arial, sans-serif; letter-spacing: -.5px; color: #fff; }
+  h1 b { color: #f6c343; } .sub { color: #b3a6d4; font-size: 14px; margin-bottom: 20px; }
+  #msg { min-height: 24px; } #detail { color: #b3a6d4; font-size: 13.5px; min-height: 18px; margin-top: 6px; white-space: pre-line; }
+  .bar { height: 10px; margin-top: 12px; background: rgba(255,255,255,.1); border-radius: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff4f8b, #f6c343); transition: width .25s; }
+  .btns { margin-top: 16px; display: none; gap: 10px; }
+  button { font: italic 800 15px Arial, sans-serif; padding: 7px 16px; border: 0; border-radius: 4px; cursor: pointer; background: #fff; color: #170c28; transform: skewX(-8deg); }
+  button.alt { background: rgba(255,255,255,.14); color: #fff; }
+  .err { color: #ffb4b4; }
+</style>
+</head>
+<body>
+<div class="stripes"></div>
+<div class="box">
+  <h1>UMA VERSUS <b>MODDED</b></h1>
+  <div class="sub">Mod manager · github.com/jaxonb423/umaversus-mods</div>
+  <div id="msg">Starting…</div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="detail"></div>
+  <div class="btns" id="btns"><button id="retry">Try again</button><button class="alt" id="safe">Start with mods off</button></div>
+</div>
+<script>window.UVM_LIB = true;</script>
+<script src="/uvm_loader.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var safe = /[?&]mods=off\b/.test(location.search), going = false;
+  function show(msg, detail, frac, err) {
+    $('msg').textContent = msg; $('msg').className = err ? 'err' : '';
+    if (detail !== undefined) $('detail').textContent = detail;
+    if (frac !== undefined) $('bar').style.width = Math.round(frac * 100) + '%';
+    $('btns').style.display = err ? 'flex' : 'none';
+  }
+  $('retry').onclick = function () { fetch('/__uvm/retry', { method: 'POST' }); show('Trying again…', '', 0); setTimeout(poll, 400); };
+  $('safe').onclick = function () { location.search = '?mods=off'; };
+
+  // which game version to start: the newest one every enabled mod works on
+  async function choose(builds) {
+    var recs = [];
+    try { recs = (await UVM.all()) || []; } catch (e) { }
+    var on = recs.filter(function (r) { return UVM.state.enabled[r.id]; });
+    if (safe || !on.length || builds.length < 2) return { b: builds[0], notice: '' };
+    var firstFail = null, firstTag = false;
+    for (var i = 0; i < builds.length; i++) {
+      var b = builds[i];
+      show('Checking your mods with game version ' + b.id + '…', '', 1);
+      var html = await (await fetch('/builds/' + b.id + '/index.html', { cache: 'no-store' })).text();
+      var m = /<script type="text\/x-uv-game" id="uv-game">([\s\S]*?)<\/script>/.exec(html);
+      if (!m) continue;
+      var res = UVM.applyMods(m[1], on, UVM.state, function (rec) { var u = {}; Object.keys(rec.files || {}).forEach(function (n) { u[n] = 'blob:check'; }); return u; });
+      var bad = Object.keys(res.errors);
+      if (!bad.length) {
+        if (i === 0) return { b: b, notice: '' };
+        var names = firstFail.map(function (id) { var r = recs.find(function (x) { return x.id === id; }); return r ? r.meta.name : id; });
+        if (firstTag) return { b: b, notice: 'The game updated to ' + builds[0].id + ' and the mod manager needs an update for it: playing ' + b.id + ' with your mods until then (it updates itself when the fix is out).' };
+        return { b: b, notice: 'The game updated to ' + builds[0].id + ', but ' + names.join(' and ') + (names.length > 1 ? " don't" : " doesn't") + ' work on it yet: playing ' + b.id + ' (the last version ' + (names.length > 1 ? 'they work' : 'it works') + ' on) until the mod is updated.' };
+      }
+      if (!firstFail) { firstFail = bad; firstTag = bad.some(function (id) { return /couldn't be tagged/.test(res.errors[id]); }); }
+    }
+    return { b: builds[0], notice: '' };   // nothing works everywhere: newest version, broken mods are skipped (their cards say why)
+  }
+
+  async function poll() {
+    if (going) return;
+    var s;
+    try { s = await (await fetch('/__uvm/status', { cache: 'no-store' })).json(); }
+    catch (e) { show("The launcher isn't running.", 'Start "Uma Versus Modded" again.', 0, true); return; }
+    var notes = (s.notes || []).join('\n');
+    if (s.state === 'error') { show("Couldn't get the game ready", s.error + (notes ? '\n' + notes : ''), 0, true); return; }
+    if (s.state !== 'ready') { show(s.msg || 'Working…', notes, s.progress || 0); setTimeout(poll, 300); return; }
+    going = true;
+    var builds = s.builds || [];
+    if (!builds.length) { going = false; show('No game version available', '', 0, true); return; }
+    var pick = await choose(builds);
+    var notice = pick.notice || (s.offline ? 'Offline: playing the last downloaded version (' + pick.b.id + ').' : '');
+    try { sessionStorage.setItem('uvm.notice', notice); } catch (e) { }
+    show('Starting the game…', [notes, notice].filter(Boolean).join('\n'), 1);
+    setTimeout(function () { location.replace('/builds/' + pick.b.id + '/index.html' + location.search); }, notice || notes ? 1400 : 150);
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

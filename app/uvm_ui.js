@@ -5,7 +5,19 @@
 const UVMUI = { recs: null, loading: false, cat: null, catErr: '', catLoading: false, focus: 0, scroll: 0, catFocus: 0, catScroll: 0,
   editId: null, editIdx: 0, dirty: false, busy: {}, msg: '', msgT: 0, removeArm: null, removeT: 0, query: '', hot: [], imgs: {}, defs: {} };
 
-function uvmOpen() { UI.screen = 'mods'; UVMUI.focus = UVMUI.focus || 0; uvmRefresh(); if (!UVMUI.cat) uvmLoadCatalog(); }
+const UVM_SCREENS = ['mods', 'modcat', 'modedit'];
+let uvmBroken = null;   // set when drawing the MODS screens failed (a game update renamed something): use the simple panel
+function uvmSafe(f, quiet) {
+  try { return f(); }
+  catch (e) {
+    console.error('[uvm]', e);
+    if (!quiet) { uvmBroken = (e && e.message) || String(e); if (UVM_SCREENS.includes(UI.screen)) UI.screen = 'mode'; uvmFallback(uvmBroken); }
+  }
+}
+function uvmOpen() {
+  if (uvmBroken || !UVM.hooks.tick || !UVM.hooks.renderScreen) { uvmFallback(uvmBroken); return; }
+  UI.screen = 'mods'; UVMUI.focus = UVMUI.focus || 0; uvmRefresh(); if (!UVMUI.cat) uvmLoadCatalog();
+}
 function uvmSay(s) { UVMUI.msg = s; UVMUI.msgT = 240; }
 function uvmFmtSize(n) { return !n ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B'; }
 function uvmCmpVer(a, b) {   // -1 / 0 / 1, numeric dotted versions
@@ -219,6 +231,7 @@ function uvmFooter(text) {
     glow(PAL.gold, 10, () => rrect(24, y - 10, W - 48, 22, 6, 'rgba(246,195,67,.18)', PAL.gold, 1.5));
     label(UI.screen === 'modedit' ? 'Changes apply after a restart — choose "Restart now" above' : 'Changes apply after a restart — press RESTART (top right)', W / 2, y + 1, 13.5, PAL.gold, 'center', 800);
   } else if (UVM.safe) label('SAFE MODE (?mods=off): every mod is off this session', W / 2, y + 1, 13.5, PAL.gold, 'center', 800);
+  else if (UVM.notice && UI.screen === 'mods') label(UVM.notice, W / 2, y + 1, 13, PAL.gold, 'center', 700);
   else label(text, W / 2, y + 1, 13, PAL.dim, 'center', 600);
 }
 
@@ -411,21 +424,86 @@ function uvmTick(e, enter, esc) {
     else if (r && (e.L || e.S || enter)) uvmEditDo(r, 1);
   }
 }
-addEventListener('keydown', ev => {
+try { addEventListener('keydown', ev => {
   if (!['mods', 'modcat', 'modedit'].includes(UI.screen) || uvmTyping()) return;
   if (ev.key === '/') { ev.preventDefault(); if (UI.screen !== 'modedit') { UVMUI.focus = -1; uvmSearchFocus(true); } }
   else if (ev.key === 'Delete' && UI.screen === 'mods') { const rec = uvmFiltered()[UVMUI.focus]; if (rec) { if (UVMUI.removeArm === rec.id && UVMUI.removeT > 0) uvmRemove(rec.id); else uvmRemoveAsk(rec.id); } }
-});
+}); } catch (e) { }
 function uvmPointer(ev) {
   if (!['mods', 'modcat', 'modedit'].includes(UI.screen)) return null;
   const r = cv.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width, y = (ev.clientY - r.top) * HGT / r.height;
   for (let i = UVMUI.hot.length - 1; i >= 0; i--) { const h = UVMUI.hot[i]; if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h; }
   return null;
 }
+if (typeof cv !== 'undefined' && cv && cv.addEventListener) {
 cv.addEventListener('pointerdown', ev => { const h = uvmPointer(ev); if (h && h.fn) { ev.preventDefault(); if (!h.hover) Sfx.play('menu'); h.fn(); } });
 cv.addEventListener('pointermove', ev => { if (['mods', 'modcat', 'modedit'].includes(UI.screen)) { const h = uvmPointer(ev); cv.style.cursor = h && (h.fn && !h.hover) ? 'pointer' : ''; } });
 cv.addEventListener('wheel', ev => {
   if (UI.screen === 'mods') { UVMUI.scroll = Math.max(0, UVMUI.scroll + Math.sign(ev.deltaY)); UVMUI.focus = Math.min(Math.max(0, UVMUI.scroll * 3), Math.max(0, uvmFiltered().length - 1)); }
   else if (UI.screen === 'modcat') { UVMUI.catScroll = Math.max(0, UVMUI.catScroll + Math.sign(ev.deltaY)); UVMUI.catFocus = Math.max(0, UVMUI.catScroll * 3); }
 }, { passive: true });
+}
+
+// ---------------------------------------------------------------- online lobby: say why modded players can't ready up
+function uvmNetHint() {
+  if (!Net.theirBuild || Net.theirBuild === BUILD || !(BUILD + Net.theirBuild).includes('+m')) return;
+  rrect(W / 2 - 330, 322, 660, 26, 6, 'rgba(23,12,40,.92)', PAL.gold, 1.5);
+  label(Net.theirBuild.includes('+m') && BUILD.includes('+m')
+    ? 'Modded: you both need the same mods, mod versions and mod settings (MODS tab).'
+    : 'One of you has mods on: both need the same mods, or both turn them off.', W / 2, 335, 14, '#fff', 'center', 700);
+}
+
+// ---------------------------------------------------------------- keep installed mods up to date (both players end up on the same versions)
+async function uvmAutoUpdate() {
+  if (UVM.safe || UVM.state.autoUpdate === false) return;
+  await uvmRefresh(); await uvmLoadCatalog();
+  const updates = (UVMUI.recs || []).filter(r => { const c = uvmCatEntry(r.id); return c && uvmCmpVer(c.version, r.meta.version) > 0; });
+  for (const r of updates) await uvmInstall(new URL(uvmCatEntry(r.id).url, UVM.catalogUrl).href, uvmCatEntry(r.id));
+  if (updates.length) { uvmSay(`Mod update: ${updates.map(r => r.meta.name).join(', ')}. Restart to use ${updates.length > 1 ? 'them' : 'it'}.`); if (typeof toast === 'function') toast('Mods updated: restart to use them (MODS tab)'); }
+}
+
+// ---------------------------------------------------------------- simple panel (plain HTML). Used if a game update breaks the MODS screens.
+let uvmFbEl = null;
+function uvmFallback(reason) {
+  if (!uvmFbEl) {
+    uvmFbEl = document.createElement('div');
+    uvmFbEl.id = 'uvm-fallback';
+    uvmFbEl.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;background:rgba(14,6,28,.78);font:600 16px "Barlow Condensed",Arial,sans-serif;color:#efe8fb';
+    uvmFbEl.addEventListener('keydown', e => e.stopPropagation(), true);
+    document.body.appendChild(uvmFbEl);
+  }
+  const box = document.createElement('div');
+  box.style.cssText = 'width:min(640px,92vw);max-height:86vh;overflow:auto;background:#22113c;border:1.5px solid rgba(255,255,255,.2);border-top:4px solid #ff4f8b;border-radius:10px;padding:18px 22px';
+  const h = (tag, text, css) => { const e = document.createElement(tag); e.textContent = text; if (css) e.style.cssText = css; return e; };
+  const btn = (text, fn, col) => { const b = h('button', text, `font:800 italic 15px "Barlow Condensed",Arial;padding:5px 14px;margin:0 6px 0 0;border:0;border-radius:4px;cursor:pointer;background:${col || '#fff'};color:#170c28`); b.onclick = fn; return b; };
+  box.appendChild(h('div', 'MODS', 'font:24px "Dela Gothic One",Arial;color:#fff;margin-bottom:4px'));
+  box.appendChild(h('div', reason ? 'Simple view: the full MODS screen hit a problem (' + reason + '), probably after a game update. Your mods still work from here.' : 'Simple view.', 'color:#b3a6d4;font-size:14px;margin-bottom:12px'));
+  const list = h('div', ''); box.appendChild(list);
+  UVM.all().then(recs => {
+    if (!recs || !recs.length) { list.appendChild(h('div', 'No mods installed.', 'color:#b3a6d4')); return; }
+    for (const r of recs) {
+      const row = h('div', '', 'display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.1)');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!UVM.state.enabled[r.id]; cb.style.cssText = 'width:20px;height:20px';
+      cb.onchange = () => { UVM.state.enabled[r.id] = cb.checked; UVM.saveState(); };
+      row.appendChild(cb);
+      row.appendChild(h('div', `${r.meta.name}  v${r.meta.version}` + (UVM.errors[r.id] ? '  —  not loaded: ' + UVM.errors[r.id] : ''), 'flex:1;color:' + (UVM.errors[r.id] ? '#ffb4b4' : '#fff')));
+      row.appendChild(btn('Remove', async () => { if (!confirm('Remove ' + r.meta.name + '?')) return; await UVM.del(r.id); delete UVM.state.enabled[r.id]; UVM.saveState(); row.remove(); }, '#ff8a8a'));
+      list.appendChild(row);
+    }
+  });
+  const bar = h('div', '', 'margin-top:14px');
+  bar.appendChild(btn('Restart', () => location.reload(), '#f6c343'));
+  bar.appendChild(btn('Start with all mods off', () => { location.search = '?mods=off'; }));
+  bar.appendChild(btn('Close', () => { uvmFbEl.style.display = 'none'; }));
+  box.appendChild(bar);
+  uvmFbEl.replaceChildren(box); uvmFbEl.style.display = 'flex';
+}
+function uvmFallbackButton() {   // a small MODS button on the menus, only if the menu entry couldn't be added
+  try {
+    const b = document.createElement('button'); b.textContent = 'MODS';
+    b.style.cssText = 'position:fixed;right:14px;bottom:40px;z-index:40;font:800 italic 15px "Barlow Condensed",Arial;padding:6px 16px;border:0;border-radius:4px;background:#ff4f8b;color:#fff;cursor:pointer;display:none';
+    b.onclick = () => uvmOpen(); document.body.appendChild(b);
+    setInterval(() => { b.style.display = ['title', 'mode'].includes(UI.screen) ? 'block' : 'none'; }, 300);
+  } catch (e) { }
+}
 // ================================================================ /Mod Manager
