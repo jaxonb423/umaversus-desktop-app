@@ -488,6 +488,7 @@ def make_shortcuts():
         return
     flag = os.path.join(DATA, "shortcuts.done")
     pyw = os.path.join(ROOT, "runtime", "pythonw.exe")
+    exe = os.path.join(ROOT, "Uma Versus Modded.exe")
     if os.path.exists(flag) or not os.path.isfile(pyw):
         return
     q = lambda p: p.replace("'", "''")   # PowerShell single-quoted string
@@ -496,15 +497,21 @@ def make_shortcuts():
     for folder in ("[Environment]::GetFolderPath('Desktop')", "[Environment]::GetFolderPath('Programs')"):
         ps.append(
             "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path " + folder + " 'Uma Versus (Modded).lnk'));"
-            f"$s.TargetPath='{q(pyw)}';$s.Arguments='\"{q(os.path.join(APP, 'launcher.py'))}\"';$s.WorkingDirectory='{q(ROOT)}';"
+            + (f"$s.TargetPath='{q(exe)}';$s.Arguments='';" if os.path.isfile(exe) else f"$s.TargetPath='{q(pyw)}';$s.Arguments='\"{q(os.path.join(APP, 'launcher.py'))}\"';") +
+            f"$s.WorkingDirectory='{q(ROOT)}';"
             f"$s.IconLocation='{q(icon)}';$s.Description='Uma Versus with mods';$s.Save();")
+    check = ("$d=[Environment]::GetFolderPath('Desktop');$p=[Environment]::GetFolderPath('Programs');"
+             "if ((Test-Path (Join-Path $d 'Uma Versus (Modded).lnk')) -and (Test-Path (Join-Path $p 'Uma Versus (Modded).lnk'))) { 'UVM-SHORTCUTS-OK' }")
     try:
-        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "".join(ps)],
-                       creationflags=0x08000000, timeout=30, check=False)
-        open(flag, "w").write(time.strftime("%Y-%m-%d"))
-        log("shortcuts made")
+        r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "".join(ps) + check],
+                           creationflags=0x08000000, timeout=30, check=False, capture_output=True, text=True)
+        if "UVM-SHORTCUTS-OK" in (r.stdout or ""):
+            open(flag, "w").write(time.strftime("%Y-%m-%d"))
+            log("shortcuts made")
+        else:
+            log("shortcuts not made (will try again next start):", r.returncode, (r.stderr or "")[:200])
     except Exception as e:
-        log("shortcuts failed:", e)
+        log("shortcuts failed (will try again next start):", e)
 
 
 # ---------------------------------------------------------------- main

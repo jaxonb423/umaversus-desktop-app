@@ -15,14 +15,16 @@ normal room codes.
 
 1. Download this repo: green **Code** button → **Download ZIP**.
 2. Right-click the zip → **Extract All**.
-3. Open the folder and double-click **`Uma Versus Modded.bat`**.
+3. Open the folder and double-click **`Uma Versus Modded.exe`**.
 
 That's it. Python comes bundled (in `runtime`), nothing gets installed. The first start
 downloads the game from umaversus.lol (about 55 MB), puts an **Uma Versus (Modded)**
 shortcut on your desktop and in the Start menu, and opens the game in its own window.
 From then on, use the shortcut. Closing the game window closes everything.
 
-- Windows may warn the first time ("Windows protected your PC"): **More info → Run anyway**.
+- The exe isn't code-signed (that costs money), so Windows may warn the first time
+  ("Windows protected your PC"): **More info → Run anyway**. If an antivirus blocks it,
+  `app\start.bat` starts the same thing.
 - Mac/Linux: run `python3 app/launcher.py` from the folder (needs Python 3.8+).
 - Your mods and settings live in the `data` folder next to the app. Keep the folder where it is.
 
@@ -186,3 +188,5 @@ request. `tools/` also holds the scripts that generated the two included mods.
 Fan project, not affiliated with Uma Versus, Cygames or Electoral Carnage. This repo does
 not contain the game: the app downloads it from umaversus.lol. `runtime/` is the official
 Windows embeddable Python 3.12.10 from python.org (PSF license, see `runtime/LICENSE.txt`).
+`Uma Versus Modded.exe` is a tiny starter for it, built from `tools/exe/` (`build_exe.sh`,
+needs `pip install ziglang`); all it does is run `runtime\pythonw.exe app\launcher.py`.
