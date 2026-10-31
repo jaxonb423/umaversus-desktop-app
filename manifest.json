@@ -1,8 +1,8 @@
 {
- "version": "2026.10.31-d1ba37b5",
+ "version": "2026.10.31-446fb470",
  "files": {
   "app/boot.html": "2392a516fa9c65f583e4c0e162b4ad894c7b292a0955fd691cc220f33fbac6a2",
-  "app/icon.ico": "16ca876f184dae3796ef4a65a891b72335b2171561814513c6dba66170c4e808",
+  "app/icon.ico": "cacad0351c042c9ba80adbe643edb1600a7f293beb453f0f7e0ee6179246c3e8",
   "app/launcher.py": "87f6ca00fb0eaa447683eb5ad9d262cc774f2c2e94bb093f89fc073547fb32d8",
   "app/uvm_bridge.js": "89413c1c3b1d3bacc5db74bd78be6112eff0bbf4772f7d7dfd9d4fd1fd944460",
   "app/uvm_loader.js": "27d4ae0f64358ac605dfd48bf6ae4bb95bfe144a59050f1b1a95cc87a758b056",
