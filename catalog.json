@@ -5,7 +5,7 @@
     {
       "id": "fuku",
       "name": "Matikanefukukitaru",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "jaxonb423",
       "kind": "fighter",
       "build": "48dacc",
@@ -18,14 +18,14 @@
       ],
       "url": "mods/fuku/fuku.uvmod.js",
       "homepage": "https://github.com/jaxonb423/umaversus-mods/tree/main/mods/fuku",
-      "size": "574 KB",
+      "size": "578 KB",
       "icon": "mods/fuku/icon.png",
       "banner": "mods/fuku/banner.png"
     },
     {
       "id": "meek",
       "name": "Happy Meek",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "author": "jaxonb423",
       "kind": "fighter",
       "build": "48dacc",
@@ -39,7 +39,7 @@
       ],
       "url": "mods/meek/meek.uvmod.js",
       "homepage": "https://github.com/jaxonb423/umaversus-mods/tree/main/mods/meek",
-      "size": "547 KB",
+      "size": "549 KB",
       "icon": "mods/meek/icon.png",
       "banner": "mods/meek/banner.png"
     },
