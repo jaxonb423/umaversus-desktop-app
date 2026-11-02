@@ -23,6 +23,27 @@
       "banner": "mods/fuku/banner.png"
     },
     {
+      "id": "meek",
+      "name": "Happy Meek",
+      "version": "1.0.0",
+      "author": "jaxonb423",
+      "kind": "fighter",
+      "build": "48dacc",
+      "description": "Set-play movement: plants one flower, then warps to it, springs off it and makes it bloom from anywhere. Air dash, B-Barrier and the Vroom, Vroom super.",
+      "tags": [
+        "fighter",
+        "setplay",
+        "movement",
+        "flower",
+        "party-dash"
+      ],
+      "url": "mods/meek/meek.uvmod.js",
+      "homepage": "https://github.com/jaxonb423/umaversus-mods/tree/main/mods/meek",
+      "size": "546 KB",
+      "icon": "mods/meek/icon.png",
+      "banner": "mods/meek/banner.png"
+    },
+    {
       "id": "nixon",
       "name": "Nixon (Electoral Carnage)",
       "version": "5.1.0",
