@@ -93,6 +93,7 @@ How it stays fair and in sync:
 | Mod | What it is |
 |---|---|
 | **Matikanefukukitaru** (`fuku`) | Fortune-teller runner: Dice Shot, Spirit Spin, Charm Tackle and the Omikuji gamble (divine lightning, Fate Swap, Double Draw, curses). Setting: *Expanded* or *Classic* Omikuji. Sprites: the Umamusume: Pretty Derby Party Dash rip from The Spriters Resource. |
+| **Happy Meek** (`meek`) | Set-play movement: plants one flower, then warps to it (Petal Step), springs off it (Sprout Slide) and makes it bloom from anywhere (Bloom). Flying through it in the air gives her air dash back; the Vroom, Vroom super fires a second fan of beams from it. Setting: *Pollen* on or off. Sprites: the Party Dash rip from The Spriters Resource; the flower is drawn by `tools/build_meek_art.py`. |
 | **Nixon (Electoral Carnage)** (`nixon`) | Nixon with his full Electoral Carnage kit and Carnage rules: stars, lightning, slam, float, Dream Stones and the Not A Crook super. Art and sounds from Electoral Carnage. |
 
 Both were tested together on build `48dacc`: offline modes, Arcade, CPU, and a two-player
@@ -181,7 +182,7 @@ on the previous one meanwhile. To fix it:
 
 Put your mod in `mods/<id>/<id>.uvmod.js` with its files (and optional `icon.png`
 128×128 and `banner.png` 600×260), run `python tools/build_catalog.py`, and open a pull
-request. `tools/` also holds the scripts that generated the two included mods.
+request. `tools/` also holds the scripts that generated the included mods.
 
 ---
 
