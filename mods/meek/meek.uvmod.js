@@ -1,7 +1,7 @@
 // ==UmaMod==
 // @id          meek
 // @name        Happy Meek
-// @version     1.0.0
+// @version     1.0.1
 // @author      jaxonb423
 // @kind        fighter
 // @build       48dacc
@@ -53,7 +53,7 @@ uvmod({
       { name: 'Starter', seq: '5L 5M 5H 41236M', note: 'Chain into Sprout Slide (low knockdown)' },
       { name: 'Low sweep', seq: '2L 2M 41236L', note: 'Lows into the short slide' },
       { name: 'Launcher air combo', seq: '2M 2H jc j.M j.H', note: 'Jump-cancel the launcher' },
-      { name: 'Bloom launch', seq: '5M 5H 623M', note: 'Needs her flower near them: Bloom launches' },
+      { name: 'Bloom launch', seq: '5M 5H 623M', note: 'With her flower under them, Bloom launches' },
     ],
     moves: baseNormals({
       '5S': { kind: 'special', name: 'Plant', input: 'S', motion: '236', cd: 80, note: 'Tosses a seed that grows into her flower (one at a time)', vnote: 'L near · M far',
@@ -122,6 +122,12 @@ function meekPlant(p) {
     x: Math.max(30, Math.min(STAGE_W - 30, p.x + p.facing * sd.x0)), y: p.y + sd.y0, facing: p.facing, vx: sd.vx * p.facing, vy: sd.vy, grav: sd.grav,
     life: 999, box: MEEK_SEED_BOX, hit: null, t: 0, dead: false, sup: false, size: 1, roll: 0, trap: null, src: baseId(p.move.id), inst: p.frame - p.t });
   Sfx.play('wind');
+}
+function meekPlantAt(p, x) {   // an open flower right away (combo trials)
+  for (const q of G.projs) if (q.flower && q.owner === p.side) q.dead = true;
+  G.projs.push({ owner: p.side, simple: false, style: 'meekFlower', flower: true, phase: 'bloom', quick: true, hitsLeft: 0, cool: 0,
+    x: Math.max(30, Math.min(STAGE_W - 30, x)), y: GY, facing: p.facing, vx: 0, vy: 0, grav: 0, life: 999999, box: MEEK_FLOWER_BOX, hit: null, t: 0, dead: false,
+    sup: false, size: 1, roll: 0, trap: null, src: '5S', inst: 0 });
 }
 function meekBloomAt(p, f, hit, n, box, src) {
   f.dead = true; meekPetals(f.x, GY - 50, 16, 50);
@@ -316,6 +322,10 @@ function meekDraw(q, x) {
     if (dist < 130 && r < 0.02 * L) { ai.seq = [{ b: 1 }, {}, { b: 1 }]; return out; }
   }
 ` },
+    { note: 'trials: Bloom trials start with her flower under the dummy',
+      find: String.raw`TR.hits = []; TR.progress = 0; TR.inst = null;`,
+      after: String.raw`
+  if (a.c.meekFlower && TR.exp.some(id => baseId(id) === '4S')) meekPlantAt(a, d.x);   // [meek]` },
     { note: 'CPU: Bloom is not an anti-air',
       find: String.raw`aa && !aa.pup && skillReady(me, '4S')`,
       replace: String.raw`aa && !aa.pup && !me.c.meekFlower && skillReady(me, '4S')` },

@@ -73,6 +73,11 @@ patches.append({"note": "online: snapshot super", "find": "  for (const k of G_K
 patches.append({"note": "online: restore super", "find": "  for (const k of G_KEYS) G[k] = s[k];\n",
                 "after": "  G.ecSup = s.ecSup ? { ...s.ecSup, p: G.p[s.ecSup.p], o: G.p[s.ecSup.o] } : null;\n"})
 
+# 6. trials: the dummy is roster slot 0, which is Nixon once he's added (his Carnage knockback breaks
+#    every other runner's trial combos): pick Special Week by name, as in the vanilla game
+patches.append({"note": "trials: dummy stays Special Week", "find": "UI.sel = [TM.char, 0];",
+                "replace": "UI.sel = [TM.char, Math.max(0, ROSTER.indexOf('spe'))];"})
+
 # 5. Arcade tables (missing in v5: LINES[...] / RIVAL[...] are read with no fallback)
 arcade = [
     ("RIVAL", " nixon: 'spe',"),
@@ -86,7 +91,7 @@ for name, payload in arcade:
 header = """// ==UmaMod==
 // @id          nixon
 // @name        Nixon (Electoral Carnage)
-// @version     5.1.0
+// @version     5.1.1
 // @author      jaxonb423
 // @kind        fighter
 // @build       48dacc
