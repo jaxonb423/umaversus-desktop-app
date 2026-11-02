@@ -1,7 +1,7 @@
 // ==UmaMod==
 // @id          fuku
 // @name        Matikanefukukitaru
-// @version     1.0.0
+// @version     1.0.1
 // @author      jaxonb423
 // @kind        fighter
 // @build       48dacc
@@ -91,6 +91,10 @@ function fukuApplyMode() {
   if (typeof Music !== 'undefined' && typeof MUSIC_URL === 'string' && !Music.urls.fuku) Music.urls.fuku = MUSIC_URL + 'spe.mp3';   // her stage plays Special Week's theme
 }
 setTimeout(function () { try { fukuApplyMode(); } catch (e) {} }, 0);
+
+// Omikuji combo trials (TRIAL_EXTRA.fuku entries with omikuji / blessed): the trial decides the slip
+function fukuTrial(p) { if (G.mode !== 'training' || typeof TR === 'undefined' || !TR.on || TR.cid !== 'fuku' || !p || p.side !== 0) return null; return TR.list[TR.idx] || null; }
+function fukuForcedSlip(p) { var t = fukuTrial(p); return t && t.omikuji ? [].concat(t.omikuji) : null; }
 /* <<< fuku mode */
 ` },
     { note: "Omikuji, Dice Shot, Prayer",
@@ -134,6 +138,8 @@ setTimeout(function () { try { fukuApplyMode(); } catch (e) {} }, 0);
         var sub = function () { var s; do { s = roll(); } while (s === 'double'); return s; };
         slips = [sub(), sub()];
       }
+      var forced = fukuForcedSlip(p);   // Omikuji combo trials pick the slip (never outside a trial)
+      if (forced) { slip = forced[0]; slips = forced.length > 1 ? forced.slice(1) : [slip]; addText('FORCED FOR THIS TRIAL', p.x, GY - 288, '#ffd24a', 15, 75); }
       p.fukuSlips = slips; p.fukuSlip = slips[0];
       var head = LAB[slip];
       addText(head[0], p.x, GY - 235, head[1], 26, 75); p.flash = 8;
@@ -222,6 +228,40 @@ setTimeout(function () { try { fukuApplyMode(); } catch (e) {} }, 0);
     { note: "SKIN",
       find: String.raw`const SKIN = {`,
       after: String.raw` fuku: ['#fbceae', '#d7c5b7', '#ffa48a', '#f3b388', '#e95a59', '#d77650', '#b23a40'],` },
+    { note: "Omikuji trials: forced Blessing",
+      find: String.raw`function trialTrack() {`,
+      after: String.raw`
+  { const ft = fukuTrial(G.p[0]); if (ft && ft.blessed) { G.p[0].guts = Math.max(G.p[0].guts, 30); G.p[0].gold = Math.max(G.p[0].gold, 30); } }   // [fuku] the trial keeps 吉 Blessing on` },
+    { note: "Omikuji trials: announce the forced slip",
+      find: String.raw`TR.hits = []; TR.progress = 0; TR.inst = null;`,
+      after: String.raw`
+  { const ft = fukuTrial(a); if (ft && ft.blessed) { a.guts = a.gold = 360; callout(a, '吉 BLESSING (FORCED)', 'spurt'); } else if (ft && ft.omikuji) callout(a, 'OMIKUJI FORCED: ' + [].concat(ft.omikuji).join(' + ').toUpperCase(), 'spurt'); }   // [fuku]` },
+    { note: 'trial demo: 66M > 2H loop timing',
+      find: String.raw`const ready = () => {
+    if (D.queue.length) return false;`,
+      after: String.raw`
+    if (toks[ti] === 'dM' && d.airborne && (d.vy <= 0 || d.y < GY - 150)) return false;   // 66M > 2H loop: dash in once they fall below ~150 px [umaversus-mods]` },
+    { note: 'CPU combos: 66M > 2H loop timing',
+      find: String.raw`const ready = () => {
+    if (R.queue.length) return false;`,
+      after: String.raw`
+    if (R.toks[ti] === 'dM' && o.airborne && (o.vy <= 0 || o.y < GY - 150)) { R.idle = 0; return false; }   // 66M > 2H loop timing [umaversus-mods]` },
+    { note: "CPU: Omikuji trials are trial-only",
+      find: String.raw`if (t.seq.startsWith('j.')) return false;`,
+      after: String.raw` if (t.omikuji || t.blessed) return false;   // [fuku] forced slips only exist in the trial` },
+    { note: "combo trials",
+      find: String.raw`const TRIAL_EXTRA = {`,
+      after: String.raw`
+  fuku: [
+    { name: "Low tackle", seq: "2L 2M 5H 41236M", note: "Lows into 5H, then Charm Tackle" },
+    { name: "EX Spirit Spin", seq: "5L 5M 5H 214H", note: "EX Spirit Spin: five hits that carry them across the screen" },
+    { name: "Ground bounce relaunch", seq: "2M 2H jc j.M j.H 2H", note: "j.H in an air combo slams them into a ground bounce. Relaunch with 2H" },
+    { name: "Tackle wall bounce", seq: "5M 5H 41236H , 5M 5H 214M", note: "EX Charm Tackle wall-bounces in the corner. Link 5M, then Spirit Spin", corner: true },
+    { name: "Lunge loop", seq: "2M 2H , dM 2H , dM 41236M", note: "The 66M > 2H loop: dash in with 66M as they fall, 2H, 66M again, then Charm Tackle" },
+    { name: "Omikuji: Great Blessing", seq: "623M , dM 2H jc j.H", note: "OMIKUJI FORCED to 大吉 Great Blessing for this trial (it's random in a match). The lightning launches them: 66M, 2H, jump-cancel j.H", omikuji: "daikichi" },
+    { name: "Omikuji: lightning loop", seq: "623M , dM 2H , dM 41236M", note: "OMIKUJI FORCED to 大吉 Great Blessing for this trial (it's random in a match). Lightning, then the 66M > 2H loop into Charm Tackle", omikuji: "daikichi" },
+    { name: "Omikuji: Double Draw", seq: "623M , dM 2H , dM 41236M", note: "OMIKUJI FORCED to Double Draw (大吉 + 吉) for this trial (it's random in a match). Lightning launches them and the Blessing boosts every hit after", omikuji: ["double", "daikichi", "kichi"] },
+    { name: "Omikuji: Blessing loop", seq: "2M 2H , dM 2H , dM 236M", note: "吉 Blessing FORCED on for this trial (in a match it comes from a random Omikuji slip): faster, harder hits. 66M > 2H loop, then Fortune Shot", blessed: true }],` },
     { note: "RATING",
       find: String.raw`const RATING = {`,
       after: String.raw` fuku: [3, 3, 3, 4],` },

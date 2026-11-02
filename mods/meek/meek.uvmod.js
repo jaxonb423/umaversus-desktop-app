@@ -1,7 +1,7 @@
 // ==UmaMod==
 // @id          meek
 // @name        Happy Meek
-// @version     1.0.1
+// @version     1.0.2
 // @author      jaxonb423
 // @kind        fighter
 // @build       48dacc
@@ -325,7 +325,25 @@ function meekDraw(q, x) {
     { note: 'trials: Bloom trials start with her flower under the dummy',
       find: String.raw`TR.hits = []; TR.progress = 0; TR.inst = null;`,
       after: String.raw`
-  if (a.c.meekFlower && TR.exp.some(id => baseId(id) === '4S')) meekPlantAt(a, d.x);   // [meek]` },
+  if (a.c.meekFlower && TR.exp.some(id => baseId(id) === '4S' || id === '6SX')) meekPlantAt(a, d.x);   // [meek]` },
+    { note: 'trial demo: 66M > 2H loop timing',
+      find: String.raw`const ready = () => {
+    if (D.queue.length) return false;`,
+      after: String.raw`
+    if (toks[ti] === 'dM' && d.airborne && (d.vy <= 0 || d.y < GY - 150)) return false;   // 66M > 2H loop: dash in once they fall below ~150 px [umaversus-mods]` },
+    { note: 'CPU combos: 66M > 2H loop timing',
+      find: String.raw`const ready = () => {
+    if (R.queue.length) return false;`,
+      after: String.raw`
+    if (R.toks[ti] === 'dM' && o.airborne && (o.vy <= 0 || o.y < GY - 150)) { R.idle = 0; return false; }   // 66M > 2H loop timing [umaversus-mods]` },
+    { note: 'combo trials',
+      find: String.raw`const TRIAL_EXTRA = {`,
+      after: String.raw`
+  meek: [
+    { name: "Bloom juggle", seq: "5M 5H 623M , dM 2H , dM 2H jc j.M j.H", note: "Bloom launches them off her flower. Then the 66M > 2H loop twice: dash in with 66M as they fall, 2H, again, then an air combo" },
+    { name: "Petal burst", seq: "5M 5H 214H , dM 2H jc j.M j.H", note: "EX Petal Step: she warps to the flower and it bursts twice. 66M as they fall, 2H, jump-cancel into an air combo" },
+    { name: "Relaunch bloom", seq: "2M 2H jc j.M j.H 2H 623M", note: "Ground bounce off j.H, relaunch with 2H, then Bloom" },
+    { name: "Double air combo", seq: "2M 2H jc j.M j.H 2H jc j.M j.H", note: "Ground bounce off j.H, then launch and jump again" }],` },
     { note: 'CPU: Bloom is not an anti-air',
       find: String.raw`aa && !aa.pup && skillReady(me, '4S')`,
       replace: String.raw`aa && !aa.pup && !me.c.meekFlower && skillReady(me, '4S')` },

@@ -45,6 +45,11 @@ ev = must_replace(ev, "          if (hurtboxOK(o) && !invulnerable(o, false)) {\
 ev = must_replace(ev, "          p.hp = Math.max(1, Math.round(theirs * p.c.hp)); o.hp = Math.max(1, Math.round(mine * o.c.hp));",
                   "          var snap = function (d, pct) { return d.c.ec ? Math.max(1, Math.round(Math.max(1, Math.round(pct * 12)) * d.c.hp / 12)) : Math.max(1, Math.round(pct * d.c.hp)); };\n"
                   "          p.hp = snap(p, theirs); o.hp = snap(o, mine);")
+# combo trials: an Omikuji trial forces its slip (see tools/fuku_trials.json for the trial patches)
+ev = must_replace(ev, "      p.fukuSlips = slips; p.fukuSlip = slips[0];",
+                  "      var forced = fukuForcedSlip(p);   // Omikuji combo trials pick the slip (never outside a trial)\n"
+                  "      if (forced) { slip = forced[0]; slips = forced.length > 1 ? forced.slice(1) : [slip]; addText('FORCED FOR THIS TRIAL', p.x, GY - 288, '#ffd24a', 15, 75); }\n"
+                  "      p.fukuSlips = slips; p.fukuSlip = slips[0];")
 assert "Math.random()" not in ev.replace("Math.random() - .5) * 50", "").replace("Math.random() * 220", "").replace("Math.random() * 6", ""), "a gameplay Math.random is left"
 
 mode = """
@@ -59,6 +64,10 @@ function fukuApplyMode() {
   if (typeof Music !== 'undefined' && typeof MUSIC_URL === 'string' && !Music.urls.fuku) Music.urls.fuku = MUSIC_URL + 'spe.mp3';   // her stage plays Special Week's theme
 }
 setTimeout(function () { try { fukuApplyMode(); } catch (e) {} }, 0);
+
+// Omikuji combo trials (TRIAL_EXTRA.fuku entries with omikuji / blessed): the trial decides the slip
+function fukuTrial(p) { if (G.mode !== 'training' || typeof TR === 'undefined' || !TR.on || TR.cid !== 'fuku' || !p || p.side !== 0) return null; return TR.list[TR.idx] || null; }
+function fukuForcedSlip(p) { var t = fukuTrial(p); return t && t.omikuji ? [].concat(t.omikuji) : null; }
 /* <<< fuku mode */
 """
 
@@ -73,11 +82,13 @@ patches = [
 for name, payload in F.FUKU_TABLES:
     patches.append({"note": name, "find": f"const {name} = {{", "after": payload})
 # the BLURB fix etc. are already in FUKU_CHARS
+import os as _os
+patches += json.load(open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "fuku_trials.json"), encoding="utf-8"))
 
 header = """// ==UmaMod==
 // @id          fuku
 // @name        Matikanefukukitaru
-// @version     1.0.0
+// @version     1.0.1
 // @author      jaxonb423
 // @kind        fighter
 // @build       48dacc
