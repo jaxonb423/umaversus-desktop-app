@@ -1,7 +1,9 @@
 // ================================================================ Uma Versus Mod Manager: the MODS tab
 // Screens: 'mods' (your mods), 'modcat' (the catalog), 'modedit' (one mod's info + settings).
 // Drawn with the game's own helpers so it looks like the rest of the menus. Mouse, keyboard and pads all work.
-// Mods are code: they patch the game when it starts. Any change here applies after RESTART.
+// Mods are code. The mod loader installs them into the game right here: every install, update, removal,
+// on/off switch or setting change makes the modded game again (UVM.commit) and saves it, and the game
+// runs that saved copy when it starts. The new game runs after RESTART.
 const UVMUI = { recs: null, loading: false, cat: null, catErr: '', catLoading: false, focus: 0, scroll: 0, catFocus: 0, catScroll: 0,
   editId: null, editIdx: 0, dirty: false, busy: {}, msg: '', msgT: 0, removeArm: null, removeT: 0, query: '', hot: [], imgs: {}, defs: {} };
 
@@ -83,9 +85,17 @@ async function uvmInstall(url, entry) {
       if (a) { try { art[k] = await uvmBlob(new URL(a, entry ? UVM.catalogUrl : url).href); } catch (e) { } }
     }
     const old = await UVM.get(meta.id);
+    UVMUI.busy[key] = 'installing';
     await UVM.put({ id: meta.id, meta, src, url, files, art, size, installedAt: Date.now() });
+    // install it into this game version now: if it doesn't fit, put things back the way they were
+    const check = await UVM.commit({ try: { [meta.id]: true } }).catch(e => ({ errors: { [meta.id]: e.message || String(e) } }));
+    if (check.errors[meta.id]) {
+      if (old) await UVM.put(old); else await UVM.del(meta.id);
+      throw new Error(meta.name + " doesn't work on this game version (" + check.errors[meta.id] + ')');
+    }
     if (!old) UVM.state.enabled[meta.id] = true;
     UVM.saveState();
+    await UVM.commit();
     delete UVMUI.defs[meta.id]; delete UVMUI.imgs[meta.id + ':icon']; delete UVMUI.imgs[meta.id + ':banner'];
     UVMUI.dirty = true; uvmSay((old ? 'Updated ' : 'Installed ') + meta.name + ' ' + meta.version + '. Restart to play with it.');
     Sfx.play('stamp');
@@ -96,11 +106,33 @@ async function uvmInstall(url, entry) {
 async function uvmRemove(id) {
   await UVM.del(id);
   delete UVM.state.enabled[id]; delete UVM.state.settings[id]; UVM.saveState();
+  await uvmCommit();
   UVMUI.dirty = true; uvmSay('Removed. Restart to finish.'); await uvmRefresh();
   UVMUI.focus = Math.min(UVMUI.focus, Math.max(0, uvmFiltered().length - 1));
 }
-function uvmToggle(id) { UVM.state.enabled[id] = !uvmOn(id); UVM.saveState(); UVMUI.dirty = true; Sfx.play('menu'); }
-function uvmRestart() { Sfx.play('ok'); setTimeout(() => location.reload(), 120); }
+// make + save the modded game for the current mods and settings (shows a message if that fails)
+async function uvmCommit() {
+  try { const b = await UVM.commit(); UVMUI.lastErrors = b.errors; return b; }
+  catch (e) { uvmSay("Couldn't save the modded game: " + (e.message || e)); return null; }
+}
+let uvmCommitT = null;
+function uvmCommitSoon() { clearTimeout(uvmCommitT); uvmCommitT = setTimeout(uvmCommit, 300); }   // settings: once the cycling stops
+async function uvmToggle(id) {
+  const on = !uvmOn(id);
+  UVM.state.enabled[id] = on; UVM.saveState(); UVMUI.dirty = true; Sfx.play('menu');
+  const b = await uvmCommit();
+  if (on && b && b.errors[id]) {   // it can't go into this game version: leave it off
+    UVM.state.enabled[id] = false; UVM.saveState(); await uvmCommit();
+    const r = (UVMUI.recs || []).find(x => x.id === id);
+    uvmSay((r ? r.meta.name : id) + " can't be turned on: " + b.errors[id]); Sfx.play('back');
+  }
+}
+async function uvmRestart() {
+  Sfx.play('ok');
+  if (uvmCommitT) { clearTimeout(uvmCommitT); uvmCommitT = null; await uvmCommit(); }
+  await UVM.pending;
+  setTimeout(() => location.reload(), 120);
+}
 async function uvmInstallLink() {
   const u = prompt('Link to a mod file (.uvmod.js):', 'https://');
   if (!u || !/^https?:\/\//.test(u.trim())) return;
@@ -246,7 +278,7 @@ function uvmDrawMods() {
     panel(W / 2 - 300, 170, 600, 130, PAL.rose);
     txt(UVMUI.query ? 'NO MATCHES' : 'NO MODS YET', W / 2, 214, 30, '#fff');
     label(UVMUI.query ? 'Try another name, creator or #tag.' : 'Press + ADD MOD to browse the catalog: new runners, new moves and more.', W / 2, 254, 15, '#e8e0f6', 'center', 600);
-    label('Mods are code. They change the game when it starts. Only add mods from people you trust.', W / 2, 278, 13, PAL.dim, 'center', 600);
+    label('Mods are code. They change the game once you install them. Only add mods from people you trust.', W / 2, 278, 13, PAL.dim, 'center', 600);
   } else {
     const rows = Math.ceil(list.length / 3), sel = UVMUI.focus;
     if (sel >= 0) { const r = Math.floor(sel / 3); if (r < UVMUI.scroll) UVMUI.scroll = r; if (r > UVMUI.scroll + 1) UVMUI.scroll = r - 1; }
@@ -254,13 +286,14 @@ function uvmDrawMods() {
     list.forEach((rec, i) => {
       const r = Math.floor(i / 3) - UVMUI.scroll; if (r < 0 || r > 1) return;
       const x = UVM_GX + (i % 3) * (UVM_CW + UVM_GAP), y = UVM_GY + r * (UVM_CH + UVM_GAP), id = rec.id;
-      const err = UVM.errors[id] || (UVMUI.defs[id] && UVMUI.defs[id].err), on = uvmOn(id), run = uvmRunning(id), arm = UVMUI.removeArm === id && UVMUI.removeT > 0;
+      const err = (UVMUI.lastErrors || UVM.errors)[id] || (UVMUI.defs[id] && UVMUI.defs[id].err), on = uvmOn(id), run = uvmRunning(id), arm = UVMUI.removeArm === id && UVMUI.removeT > 0;
       const upd = uvmCatEntry(id) && uvmCmpVer(uvmCatEntry(id).version, rec.meta.version) > 0;
       uvmCard(x, y, { meta: rec.meta, artKey: id, sel: sel === i, size: uvmFmtSize(rec.size), bottom: (bx, by) => {
         uvmSwitch(bx + 12, by + 4, on, () => { UVMUI.focus = i; uvmToggle(id); });
         const st = err && on ? ['ERROR', PAL.p2] : on !== run ? ['RESTART', PAL.gold] : on ? ['ON', PAL.turf] : ['OFF', PAL.dim];
         label(st[0], bx + 60, by + 15, 13, st[1], 'left', 900, true);
-        if (upd) label('UPDATE', bx + 60 + (st[0].length * 9) + 8, by + 15, 12, PAL.gold, 'left', 900, true);
+        if (upd) { const ux = bx + 60 + (st[0].length * 9) + 8; label(UVMUI.busy[id] ? '…' : 'UPDATE', ux, by + 15, 12, PAL.gold, 'left', 900, true);
+          uvmHot(ux - 4, by + 3, 58, 24, () => { UVMUI.focus = i; const c = uvmCatEntry(id); uvmInstall(new URL(c.url, UVM.catalogUrl).href, c); }); }
         uvmBtn(bx + 140, by + 2, 66, 24, 'EDIT', false, () => { UVMUI.focus = i; uvmEdit(id); });
         uvmBtn(bx + 214, by + 2, 72, 24, arm ? 'SURE?' : 'REMOVE', arm, () => { UVMUI.focus = i; uvmRemoveAsk(id); }, PAL.p2);
       } });
@@ -319,7 +352,7 @@ function uvmSetCycle(key, s, dir) {
   const id = UVMUI.editId, cur = (UVM.state.settings[id] || {})[key] ?? s.default;
   const i = s.options.findIndex(o => o[0] === cur), n = s.options.length;
   (UVM.state.settings[id] = UVM.state.settings[id] || {})[key] = s.options[((i < 0 ? 0 : i) + dir + n) % n][0];
-  UVM.saveState(); UVMUI.dirty = true; Sfx.play('menu');
+  UVM.saveState(); UVMUI.dirty = true; Sfx.play('menu'); uvmCommitSoon();
 }
 function uvmEditDo(row, dir) {
   const id = UVMUI.editId, rec = (UVMUI.recs || []).find(r => r.id === id);
@@ -453,13 +486,15 @@ function uvmNetHint() {
     : 'One of you has mods on: both need the same mods, or both turn them off.', W / 2, 335, 14, '#fff', 'center', 700);
 }
 
-// ---------------------------------------------------------------- keep installed mods up to date (both players end up on the same versions)
-async function uvmAutoUpdate() {
-  if (UVM.safe || UVM.state.autoUpdate === false) return;
+// ---------------------------------------------------------------- mod updates: only say they're out. Nothing is installed until you press UPDATE in MODS.
+async function uvmCheckUpdates() {
+  if (UVM.safe) return;
   await uvmRefresh(); await uvmLoadCatalog();
   const updates = (UVMUI.recs || []).filter(r => { const c = uvmCatEntry(r.id); return c && uvmCmpVer(c.version, r.meta.version) > 0; });
-  for (const r of updates) await uvmInstall(new URL(uvmCatEntry(r.id).url, UVM.catalogUrl).href, uvmCatEntry(r.id));
-  if (updates.length) { uvmSay(`Mod update: ${updates.map(r => r.meta.name).join(', ')}. Restart to use ${updates.length > 1 ? 'them' : 'it'}.`); if (typeof toast === 'function') toast('Mods updated: restart to use them (MODS tab)'); }
+  if (!updates.length) return;
+  const names = updates.map(r => r.meta.name).join(', ');
+  uvmSay(`Update available: ${names}. Press UPDATE on ${updates.length > 1 ? 'their cards' : 'its card'} to install it.`);
+  if (typeof toast === 'function') toast('Mod update available: ' + names + ' (MODS tab)');
 }
 
 // ---------------------------------------------------------------- simple panel (plain HTML). Used if a game update breaks the MODS screens.
@@ -484,15 +519,15 @@ function uvmFallback(reason) {
     for (const r of recs) {
       const row = h('div', '', 'display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.1)');
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!UVM.state.enabled[r.id]; cb.style.cssText = 'width:20px;height:20px';
-      cb.onchange = () => { UVM.state.enabled[r.id] = cb.checked; UVM.saveState(); };
+      cb.onchange = () => { UVM.state.enabled[r.id] = cb.checked; UVM.saveState(); UVM.commit().catch(() => { }); };
       row.appendChild(cb);
       row.appendChild(h('div', `${r.meta.name}  v${r.meta.version}` + (UVM.errors[r.id] ? '  —  not loaded: ' + UVM.errors[r.id] : ''), 'flex:1;color:' + (UVM.errors[r.id] ? '#ffb4b4' : '#fff')));
-      row.appendChild(btn('Remove', async () => { if (!confirm('Remove ' + r.meta.name + '?')) return; await UVM.del(r.id); delete UVM.state.enabled[r.id]; UVM.saveState(); row.remove(); }, '#ff8a8a'));
+      row.appendChild(btn('Remove', async () => { if (!confirm('Remove ' + r.meta.name + '?')) return; await UVM.del(r.id); delete UVM.state.enabled[r.id]; UVM.saveState(); UVM.commit().catch(() => { }); row.remove(); }, '#ff8a8a'));
       list.appendChild(row);
     }
   });
   const bar = h('div', '', 'margin-top:14px');
-  bar.appendChild(btn('Restart', () => location.reload(), '#f6c343'));
+  bar.appendChild(btn('Restart', () => UVM.pending.then(() => location.reload()), '#f6c343'));
   bar.appendChild(btn('Start with all mods off', () => { location.search = '?mods=off'; }));
   bar.appendChild(btn('Close', () => { uvmFbEl.style.display = 'none'; }));
   box.appendChild(bar);

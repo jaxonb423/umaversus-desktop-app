@@ -1,8 +1,8 @@
 #include <winver.h>
 1 ICON "../../app/icon.ico"
 1 VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION 1,1,0,0
+PRODUCTVERSION 1,1,0,0
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN
@@ -10,12 +10,12 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "FileDescription", "Uma Versus (Modded) launcher"
-      VALUE "ProductName", "Uma Versus Mods"
+      VALUE "FileDescription", "Uma Versus Desktop"
+      VALUE "ProductName", "Uma Versus Desktop"
       VALUE "CompanyName", "jaxonb423 (fan project)"
-      VALUE "FileVersion", "1.0.0"
-      VALUE "ProductVersion", "1.0.0"
-      VALUE "OriginalFilename", "Uma Versus Modded.exe"
+      VALUE "FileVersion", "1.1.0"
+      VALUE "ProductVersion", "1.1.0"
+      VALUE "OriginalFilename", "Uma Versus Desktop.exe"
       VALUE "LegalCopyright", "Fan project, not affiliated with Uma Versus or Cygames"
     END
   END

@@ -110,6 +110,6 @@
   if (!H.menu || !H.tick || !H.renderScreen) uvmFallbackButton();
 
   UVM.bridge = true;
-  setTimeout(() => uvmSafe(uvmAutoUpdate, true), 5000);
+  setTimeout(() => uvmSafe(uvmCheckUpdates, true), 5000);   // only tells you about updates; MODS installs them
 })();
 // ================================================================ /runtime hooks

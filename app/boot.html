@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Uma Versus (Modded)</title>
+<title>Uma Versus Desktop</title>
 <style>
   html, body { margin: 0; height: 100%; background: #170c28; color: #efe8fb; font: 600 17px "Segoe UI", Arial, sans-serif; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center;
@@ -25,8 +25,8 @@
 <body>
 <div class="stripes"></div>
 <div class="box">
-  <h1>UMA VERSUS <b>MODDED</b></h1>
-  <div class="sub">Mod manager · github.com/jaxonb423/umaversus-mods</div>
+  <h1>UMA VERSUS <b>DESKTOP</b></h1>
+  <div class="sub">Desktop app · mod loader included · github.com/jaxonb423/umaversus-mods</div>
   <div id="msg">Starting…</div>
   <div class="bar"><i id="bar"></i></div>
   <div id="detail"></div>
@@ -52,20 +52,23 @@
     var recs = [];
     try { recs = (await UVM.all()) || []; } catch (e) { }
     var on = recs.filter(function (r) { return UVM.state.enabled[r.id]; });
-    if (safe || !on.length || builds.length < 2) return { b: builds[0], notice: '' };
+    if (safe || !on.length) return { b: builds[0], notice: '' };
     var firstFail = null, firstTag = false;
     for (var i = 0; i < builds.length; i++) {
       var b = builds[i];
-      show('Checking your mods with game version ' + b.id + '…', '', 1);
+      show('Loading your mods…', '', 1);
       var html = await (await fetch('/builds/' + b.id + '/index.html', { cache: 'no-store' })).text();
       var m = /<script type="text\/x-uv-game" id="uv-game">([\s\S]*?)<\/script>/.exec(html);
       if (!m) continue;
-      var res = UVM.applyMods(m[1], on, UVM.state, function (rec) { var u = {}; Object.keys(rec.files || {}).forEach(function (n) { u[n] = 'blob:check'; }); return u; });
+      // the modded game the mod loader saved for this version; made here only once per new game version
+      var res;
+      try { res = await UVM.prepare(m[1], recs, UVM.state, function () { show('Putting your mods into game version ' + b.id + ' (once per game version)…', '', 1); }); }
+      catch (e) { console.warn('[uvm] prepare', e); continue; }
       var bad = Object.keys(res.errors);
       if (!bad.length) {
         if (i === 0) return { b: b, notice: '' };
         var names = firstFail.map(function (id) { var r = recs.find(function (x) { return x.id === id; }); return r ? r.meta.name : id; });
-        if (firstTag) return { b: b, notice: 'The game updated to ' + builds[0].id + ' and the mod manager needs an update for it: playing ' + b.id + ' with your mods until then (it updates itself when the fix is out).' };
+        if (firstTag) return { b: b, notice: 'The game updated to ' + builds[0].id + ' and the app needs an update for it: playing ' + b.id + ' with your mods until then (it updates itself when the fix is out).' };
         return { b: b, notice: 'The game updated to ' + builds[0].id + ', but ' + names.join(' and ') + (names.length > 1 ? " don't" : " doesn't") + ' work on it yet: playing ' + b.id + ' (the last version ' + (names.length > 1 ? 'they work' : 'it works') + ' on) until the mod is updated.' };
       }
       if (!firstFail) { firstFail = bad; firstTag = bad.some(function (id) { return /couldn't be tagged/.test(res.errors[id]); }); }
@@ -77,7 +80,7 @@
     if (going) return;
     var s;
     try { s = await (await fetch('/__uvm/status', { cache: 'no-store' })).json(); }
-    catch (e) { show("The launcher isn't running.", 'Start "Uma Versus Modded" again.', 0, true); return; }
+    catch (e) { show("The app isn't running.", 'Start "Uma Versus Desktop" again.', 0, true); return; }
     var notes = (s.notes || []).join('\n');
     if (s.state === 'error') { show("Couldn't get the game ready", s.error + (notes ? '\n' + notes : ''), 0, true); return; }
     if (s.state !== 'ready') { show(s.msg || 'Working…', notes, s.progress || 0); setTimeout(poll, 300); return; }

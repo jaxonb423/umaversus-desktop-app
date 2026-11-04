@@ -1,12 +1,12 @@
 {
- "version": "2026.10.31-62723d9a",
+ "version": "2026.11.04-137e28b3",
  "files": {
-  "app/boot.html": "2392a516fa9c65f583e4c0e162b4ad894c7b292a0955fd691cc220f33fbac6a2",
+  "app/boot.html": "949763259c3308bdb0533e878d7398b30f500906c8e97f7ad688a0da326da09f",
   "app/icon.ico": "a750a0ee61385f75f179ef62b39531de0182ac86414aaf0d579c62fe9a61e620",
-  "app/launcher.py": "b4344e6e4d9a38ba5a996e5cc3cda2c15da55ac3e232434f3861c477c1045a2c",
-  "app/start.bat": "c7d5e83daf0444a218fc960d1b6ea51fe8e37adf0c69994471107c968ea84389",
-  "app/uvm_bridge.js": "89413c1c3b1d3bacc5db74bd78be6112eff0bbf4772f7d7dfd9d4fd1fd944460",
-  "app/uvm_loader.js": "27d4ae0f64358ac605dfd48bf6ae4bb95bfe144a59050f1b1a95cc87a758b056",
-  "app/uvm_ui.js": "0f4ba7f74e3d567c5bdac6613a04f8920c8cfb33fd92030ff16b7baffb917f1b"
+  "app/launcher.py": "9817fa573e953ec36db54efd9b9db100bdabeaa7cb9bba3e0a4f7d0d2e9d179d",
+  "app/start.bat": "c29fddec116a9358579a33e0a9473ba9dd13f928f94364459313eb9db8fe5ca2",
+  "app/uvm_bridge.js": "c0ffa14e8a161d5360c8576022888c75282f77cb98dbf39871e02ce439fb99f3",
+  "app/uvm_loader.js": "5a7dd2880f71b84b142f4248df286b97545987b7f88bd3dcba7761a383f2ac2e",
+  "app/uvm_ui.js": "adc3a9b346673ba70ba636ec2db48ae8148c51e2d38681b3cf79551f020c4d96"
  }
 }
