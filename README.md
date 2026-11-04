@@ -94,10 +94,12 @@ How it stays fair and in sync:
 |---|---|
 | **Matikanefukukitaru** (`fuku`) | Fortune-teller runner: Dice Shot, Spirit Spin, Charm Tackle and the Omikuji gamble (divine lightning, Fate Swap, Double Draw, curses). Setting: *Expanded* or *Classic* Omikuji. Sprites: the Umamusume: Pretty Derby Party Dash rip from The Spriters Resource. |
 | **Happy Meek** (`meek`) | Set-play movement: plants one flower, then warps to it (Petal Step), springs off it (Sprout Slide) and makes it bloom from anywhere (Bloom). Flying through it in the air gives her air dash back; the Vroom, Vroom super fires a second fan of beams from it. Setting: *Pollen* on or off. Sprites: the Party Dash rip from The Spriters Resource; the flower is drawn by `tools/build_meek_art.py`. |
+| **Still in Love** (`sil`) | Stun-lock charmer: her hits fill a three-heart **Lovestruck** meter on the opponent, and her Wink spends the hearts on a stun (1 heart short, 2 a full combo, 3 long). Blown Kiss, Heartbreaker, the Can't Look Away command grab, a counter taunt (Hard to Get) and the Triple Tiara super, which ends in a full stun. Setting: *Lovestruck combos* Normal or *Infinite* (just for fun: hits on a stunned foe build charm, so Winks loop forever). Sprites: the Party Dash rip from The Spriters Resource; hearts are drawn in code (`tools/build_sil_art.py` builds the sheets). |
 | **Nixon (Electoral Carnage)** (`nixon`) | Nixon with his full Electoral Carnage kit and Carnage rules: stars, lightning, slam, float, Dream Stones and the Not A Crook super. Art and sounds from Electoral Carnage. |
 
-Both were tested together on build `48dacc`: offline modes, Arcade, CPU, and a two-player
-online match with forced rollbacks (no desyncs).
+Fukukitaru, Happy Meek and Nixon were tested together on build `48dacc`: offline modes, Arcade, CPU, and a two-player
+online match with forced rollbacks (no desyncs). Still in Love was tested with all three on the same build: CPU matches
+against every runner, all her combo trials, both settings, and rollback re-simulation (identical state).
 
 ---
 
