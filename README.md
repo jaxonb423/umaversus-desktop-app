@@ -11,8 +11,13 @@ install from a link, and **EDIT** for each mod's settings and updates.
 Mods also work **online**: two players with the same mods can play modded 1v1s through
 normal room codes.
 
-> **Mods are code.** They change the game's code when it starts. Only install mods from
+> **Mods are code.** They change the game's code once you install them. Only install mods from
 > people you trust. Mods in this catalog are reviewed before they're listed.
+
+**Mods are installed by the mod loader, not at game start.** Pressing **INSTALL** / **UPDATE**,
+switching a mod on or off, changing a setting or removing a mod puts your mods into the game
+right then (and tells you right away if a mod doesn't fit this game version). The game starts
+from that saved modded copy: nothing is downloaded, installed or updated by itself when it boots.
 
 ## Install (Windows) — no setup
 
@@ -42,7 +47,11 @@ version too:
 
 - **Mods still work on the new version** (the usual case): you're on the new version.
 - **A game update broke one of your mods:** you keep playing the previous version with your
-  mods, and the start screen says so, until the mod gets an update. Mods update themselves.
+  mods, and the start screen says so, until the mod gets an update (install it from MODS).
+
+This is the one time mods are put into the game at start: the first start on a new game
+version ("Putting your mods into game version …"), and once after this app update. It uses the mods you
+already installed; it never installs or updates one.
 - **No internet:** you play the last downloaded version.
 
 The mod loader hooks into the game while it runs instead of editing fixed lines of its code, so
@@ -67,15 +76,17 @@ Main menu → **MODS** (bottom bar, next to Options).
 | Catalog | **+ ADD MOD** | |
 | Back | **H** / Esc | |
 
-Every change applies after a restart: press **RESTART** (top right). Installed mods update
-themselves in the background (you'll see "Mods updated: restart"). A card that failed to load
-shows why in red; the game starts without that mod.
+Every change is installed into the game as soon as you make it, and the game runs it after a
+restart: press **RESTART** (top right). Mods don't update themselves: when a newer version is
+in the catalog you'll see "Mod update available" and an **UPDATE** button on the card; press it
+to install it. A mod that doesn't fit this game version is refused at install (or stays off when
+you switch it on), with the reason shown.
 
 ## Modded online 1v1s
 
 1. Both players use Uma Versus Desktop with the **same mods**, with the **same settings**
-   (settings marked *both players must match* on the Edit screen). Mods update themselves,
-   so after a mod update just restart both games.
+   (settings marked *both players must match* on the Edit screen). When a mod update comes
+   out, both players press **UPDATE** on it in MODS, then restart.
 2. **Online** → make or join a room with a code, exactly as usual.
 
 How it stays fair and in sync:
@@ -138,7 +149,8 @@ uvmod({
 });
 ```
 
-**Patches** are plain text edits to the game's code, applied in order when the game starts:
+**Patches** are plain text edits to the game's code, applied in order when the mod is installed
+(and again whenever the mod set or a setting changes, or the game itself updates):
 
 | Field | Meaning |
 |---|---|
@@ -149,8 +161,8 @@ uvmod({
 
 Inside patch text, `{{file:name}}` becomes a link to one of the mod's files, and
 `{{setting:key}}` becomes that setting's current value as a JS literal
-(e.g. `const FAST = {{setting:speed}} === 'fast';`). Settings are baked in at start;
-changing one needs a restart.
+(e.g. `const FAST = {{setting:speed}} === 'fast';`). Settings are baked in when you change
+them in MODS; the game uses the new value after a restart.
 
 Mods load in **id order**. Two mods can patch the same place as long as each one's anchor
 text still exists after the mods before it (inserting with `after` / `before` keeps the
@@ -181,7 +193,7 @@ on the previous one meanwhile. To fix it:
 1. Get the new page (`curl https://umaversus.lol/ -o page.html`) and see which patch fails
    (the error on the mod's card names it).
 2. Update the mod's patch text, bump its `@version`, run `python tools/build_catalog.py`, push.
-   Everyone's app picks up the new version on its next start.
+   Everyone sees "Mod update available" on their next start and installs it with **UPDATE**.
 3. If the app itself needs a change, edit `app/`, run `python tools/build_manifest.py`, push.
    Every app updates its own files from `manifest.json` (checked against the file hashes)
    at its next start.

@@ -1,15 +1,22 @@
-/* Uma Versus Mod Manager -- loader.
+/* Uma Versus Desktop -- mod loader.
  *
  * Runs before the game. The game's code sits in an inert
  * <script type="text/x-uv-game" id="uv-game"> block (the launcher put it there, with the MODS
- * screens and runtime hooks appended). This loader applies the text patches of every enabled
- * mod, in id order (so two players with the same mods get byte-identical code), then runs it.
+ * screens and runtime hooks appended).
+ *
+ * Mods are installed into the game by the mod loader, not at game start: installing, updating,
+ * removing, switching a mod on/off or changing a setting (MODS tab) applies the text patches of
+ * every enabled mod, in id order (so two players with the same mods get byte-identical code),
+ * checks the result compiles, and saves that modded game ("built" store). At game start this
+ * loader only runs the saved modded game. It builds one at start only when there is none for
+ * this exact game version + mods + settings (the game itself updated, or a loader update).
  *
  *   ?mods=off   start with every mod off (safe mode)
  *
  * Storage (per browser profile, per http://localhost:PORT):
  *   IndexedDB "uvm" / "mods"  -> { id, meta, src, url, files: {name: Blob}, art: {icon, banner}, size, installedAt }
- *   localStorage "uvm.state"  -> { enabled: {id: true}, settings: {id: {key: value}}, autoUpdate }
+ *   IndexedDB "uvm" / "built" -> { id: game version, key: mods+settings, code, running, errors, tag, at }
+ *   localStorage "uvm.state"  -> { enabled: {id: true}, settings: {id: {key: value}} }
  *
  * With window.UVM_LIB = true (the start page), it only defines UVM and doesn't start a game.
  */
@@ -18,6 +25,8 @@
   var STATE_KEY = 'uvm.state';
   var CATALOG_URL = 'https://raw.githubusercontent.com/jaxonb423/umaversus-mods/main/catalog.json';
   var BUILD_MARK = '/*uvm:build*/';
+  var LOADER_REV = 3;   // bump when the way patches are applied changes (saved modded games are made again)
+  var KEEP_BUILT = 3;   // saved modded games kept (one per game version)
 
   function fnv(str) {   // 32-bit FNV-1a
     var h = 2166136261;
@@ -38,17 +47,22 @@
     if (dbp) return dbp;
     dbp = new Promise(function (ok, fail) {
       if (!window.indexedDB) { fail(new Error('This browser has no IndexedDB')); return; }
-      var r = indexedDB.open('uvm', 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore('mods', { keyPath: 'id' }); };
+      var r = indexedDB.open('uvm', 2);
+      r.onupgradeneeded = function () {
+        var names = r.result.objectStoreNames;
+        if (!names.contains('mods')) r.result.createObjectStore('mods', { keyPath: 'id' });
+        if (!names.contains('built')) r.result.createObjectStore('built', { keyPath: 'id' });
+      };
+      r.onblocked = function () { fail(new Error('Close the other Uma Versus window and restart')); };
       r.onsuccess = function () { ok(r.result); };
       r.onerror = function () { fail(r.error); };
     });
     return dbp;
   }
-  function tx(mode, fn) {
+  function tx(mode, fn, store) {
     return db().then(function (d) {
       return new Promise(function (ok, fail) {
-        var t = d.transaction('mods', mode), st = t.objectStore('mods'), res;
+        var t = d.transaction(store || 'mods', mode), st = t.objectStore(store || 'mods'), res;
         var req = fn(st);
         if (req) req.onsuccess = function () { res = req.result; };
         t.oncomplete = function () { ok(res); };
@@ -153,6 +167,58 @@
     return m ? (m[1].match(/['"]([^'"]+)['"]/g) || []).map(function (s) { return s.slice(1, -1); }) : null;
   }
 
+  // ---------------------------------------------------------------- the saved modded game
+  // {{file:x}} becomes a placeholder in the saved code; at start it's swapped for a link to the stored file.
+  var FILE_RE = /@@uvmfile:([a-z0-9-]+):([^@\s]+)@@/g;
+  function fileTokens(rec) { var u = {}; Object.keys(rec.files || {}).forEach(function (n) { u[n] = '@@uvmfile:' + rec.id + ':' + n + '@@'; }); return u; }
+  function gameId(base) { return hex(fnv(base)) + '-' + base.length; }
+  function enabledRecs(recs, state) {
+    return (recs || []).filter(function (r) { return state.enabled[r.id]; }).sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+  }
+  function modsKey(recs, state) {   // what the saved game was made from: changes whenever a mod, its files or its settings change
+    return hex(fnv(JSON.stringify([LOADER_REV, enabledRecs(recs, state).map(function (r) {
+      return [r.id, r.meta.version, hex(fnv(r.src)), Object.keys(r.files || {}).sort(), state.settings[r.id] || {}];
+    })])));
+  }
+  function tagOf(running) {
+    return running.length ? '+m' + hex(fnv(JSON.stringify(running.map(function (m) { return [m.id, m.version, m.hash, m.synced]; }))), 6) : '';
+  }
+  function build(base, recs, state) {
+    var res = applyMods(base, recs, state, fileTokens);
+    return { id: gameId(base), key: modsKey(recs, state), code: res.running.length ? res.code : null, running: res.running, errors: res.errors, tag: tagOf(res.running), at: Date.now() };
+  }
+  function getBuilt(id) { return tx('readonly', function (st) { return st.get(id); }, 'built'); }
+  function putBuilt(b) {
+    return tx('readwrite', function (st) { return st.put(b); }, 'built').then(function () {
+      return tx('readonly', function (st) { return st.getAllKeys(); }, 'built');
+    }).then(function (keys) {   // keep the newest few game versions
+      return Promise.all((keys || []).map(getBuilt)).then(function (all) {
+        all.sort(function (a, b) { return b.at - a.at; });
+        return Promise.all(all.slice(KEEP_BUILT).map(function (o) { return tx('readwrite', function (st) { return st.delete(o.id); }, 'built'); }));
+      });
+    });
+  }
+  // the saved modded game for this game version, made now only if there's none for the current mods + settings
+  function prepare(base, recs, state, onBuild) {
+    var id = gameId(base), key = modsKey(recs, state);
+    if (!enabledRecs(recs, state).length) return Promise.resolve({ id: id, key: key, code: null, running: [], errors: {}, tag: '', fresh: false });
+    return getBuilt(id).catch(function () { return null; }).then(function (b) {
+      if (b && b.key === key) return b;
+      if (onBuild) onBuild();
+      b = build(base, recs, state);
+      return putBuilt(b).catch(function (e) { console.warn('[uvm] could not save the modded game', e); }).then(function () { b.fresh = true; return b; });
+    });
+  }
+  function withFiles(code, recs) {   // placeholders -> links to this session's copies of the mods' files
+    var byId = {}, made = {};
+    (recs || []).forEach(function (r) { byId[r.id] = r; });
+    return code.replace(FILE_RE, function (all, id, name) {
+      var k = id + ':' + name;
+      if (!(k in made)) { var r = byId[id], f = r && r.files && r.files[name]; made[k] = f ? URL.createObjectURL(f) : ''; }
+      return made[k];
+    });
+  }
+
   // ---------------------------------------------------------------- the official services stay vanilla-only
   // While mods run, block writes to the game's backend (leaderboard results, public room list ...),
   // whatever the game's code calls them. Sign-in, profile, friends and settings sync still work.
@@ -176,7 +242,7 @@
 
   // ---------------------------------------------------------------- public object
   var UVM = window.UVM = {
-    version: '2.0.0',
+    version: '2.1.0',
     catalogUrl: (function () { try { return localStorage.getItem('uvm.catalog') || CATALOG_URL; } catch (e) { return CATALOG_URL; } })(),
     safe: /[?&]mods=off\b/.test(location.search),
     active: false, mods: [], errors: {}, installed: [], tag: '', hooks: {},
@@ -184,11 +250,34 @@
     notice: (function () { try { return sessionStorage.getItem('uvm.notice') || ''; } catch (e) { return ''; } })(),
     fnv: fnv, hex: hex, parseHeader: parseHeader, evalMod: evalMod, applyPatches: applyPatches, applyMods: applyMods,
     settingValues: settingValues, listOf: listOf, BUILD_MARK: BUILD_MARK,
+    gameId: gameId, modsKey: modsKey, build: build, prepare: prepare, getBuilt: getBuilt, putBuilt: putBuilt,
     saveState: function () { try { localStorage.setItem(STATE_KEY, JSON.stringify(UVM.state)); } catch (e) { } },
     all: function () { return tx('readonly', function (st) { return st.getAll(); }); },
     get: function (id) { return tx('readonly', function (st) { return st.get(id); }); },
     put: function (rec) { return tx('readwrite', function (st) { return st.put(rec); }); },
     del: function (id) { return tx('readwrite', function (st) { return st.delete(id); }); },
+    // install the current mods + settings into this game version now (the mod loader calls this on every change).
+    // try: { id: true } also checks that mod as if it were on. Resolves to the build (errors per mod id).
+    pending: Promise.resolve(),
+    commit: function (opt) {
+      opt = opt || {};
+      var run = function () {
+        var tpl = document.getElementById('uv-game');
+        if (!tpl) return Promise.reject(new Error('game template missing'));
+        var base = tpl.textContent;
+        return UVM.all().then(function (recs) {
+          recs = recs || [];
+          var state = UVM.state;
+          if (opt.try) { state = JSON.parse(JSON.stringify(UVM.state)); Object.keys(opt.try).forEach(function (id) { state.enabled[id] = true; }); }
+          var b = build(base, recs, state);
+          if (opt.try) return b;   // a check only: nothing saved
+          return (enabledRecs(recs, state).length ? putBuilt(b) : Promise.resolve()).then(function () { return b; });
+        });
+      };
+      var p = UVM.pending.then(run, run);
+      UVM.pending = p.catch(function () { });
+      return p;
+    },
     // match seed: online from the room's shared match key (both players agree), otherwise random
     seed: function (mode) {
       if (mode === 'online' || mode === 'spectate') {
@@ -217,21 +306,23 @@
     if (!tpl) { console.error('[uvm] game template missing'); return; }
     var base = tpl.textContent;
     UVM.baseRoster = listOf(base, 'ROSTER'); UVM.baseThemes = listOf(base, 'THEME_IDS');
-    var res = { code: base, running: [], errors: {} };
+    var res = { code: null, running: [], errors: {}, tag: '' }, recs = [];
     return UVM.all().then(function (list) {
-      list = list || [];
-      UVM.installed = list.map(function (r) { return { id: r.id, meta: r.meta, url: r.url, size: r.size }; });
-      if (!UVM.safe) res = applyMods(base, list, UVM.state, function (rec) {
-        var urls = {}; Object.keys(rec.files || {}).forEach(function (n) { urls[n] = URL.createObjectURL(rec.files[n]); }); return urls;
-      });
+      recs = list || [];
+      UVM.installed = recs.map(function (r) { return { id: r.id, meta: r.meta, url: r.url, size: r.size }; });
+      if (UVM.safe) return;
+      // run the modded game the mod loader saved; nothing is downloaded or patched here
+      return prepare(base, recs, UVM.state, function () { console.info('[uvm] no saved modded game for this game version yet: making it once'); })
+        .then(function (b) { res = b; UVM.madeAtStart = !!b.fresh; });
     }).catch(function (e) {
       console.warn('[uvm] mod storage unavailable, starting without mods:', e);
       UVM.storageError = (e && e.message) || String(e);
     }).then(function () {
-      UVM.mods = res.running; UVM.errors = res.errors; UVM.active = res.running.length > 0;
-      UVM.tag = UVM.active ? '+m' + hex(fnv(JSON.stringify(res.running.map(function (m) { return [m.id, m.version, m.hash, m.synced]; }))), 6) : '';
+      UVM.mods = res.running; UVM.errors = res.errors; UVM.active = !!res.code && res.running.length > 0;
+      UVM.tag = UVM.active ? res.tag : '';
       Object.keys(res.errors).forEach(function (id) { console.warn('[uvm] mod "' + id + '" not loaded:', res.errors[id]); });
-      try { runGame(res.code); }
+      if (!UVM.active) { UVM.mods = []; runGame(base); return; }
+      try { runGame(withFiles(res.code, recs)); }
       catch (e) { console.error('[uvm] game failed with mods, starting vanilla', e); UVM.mods = []; UVM.active = false; UVM.tag = ''; runGame(base); }
     });
   }

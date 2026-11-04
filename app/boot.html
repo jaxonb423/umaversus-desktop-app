@@ -52,15 +52,18 @@
     var recs = [];
     try { recs = (await UVM.all()) || []; } catch (e) { }
     var on = recs.filter(function (r) { return UVM.state.enabled[r.id]; });
-    if (safe || !on.length || builds.length < 2) return { b: builds[0], notice: '' };
+    if (safe || !on.length) return { b: builds[0], notice: '' };
     var firstFail = null, firstTag = false;
     for (var i = 0; i < builds.length; i++) {
       var b = builds[i];
-      show('Checking your mods with game version ' + b.id + '…', '', 1);
+      show('Loading your mods…', '', 1);
       var html = await (await fetch('/builds/' + b.id + '/index.html', { cache: 'no-store' })).text();
       var m = /<script type="text\/x-uv-game" id="uv-game">([\s\S]*?)<\/script>/.exec(html);
       if (!m) continue;
-      var res = UVM.applyMods(m[1], on, UVM.state, function (rec) { var u = {}; Object.keys(rec.files || {}).forEach(function (n) { u[n] = 'blob:check'; }); return u; });
+      // the modded game the mod loader saved for this version; made here only once per new game version
+      var res;
+      try { res = await UVM.prepare(m[1], recs, UVM.state, function () { show('Putting your mods into game version ' + b.id + ' (once per game version)…', '', 1); }); }
+      catch (e) { console.warn('[uvm] prepare', e); continue; }
       var bad = Object.keys(res.errors);
       if (!bad.length) {
         if (i === 0) return { b: b, notice: '' };
