@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Uma Versus (Modded) -- desktop launcher.
+Uma Versus Desktop -- the desktop app for Uma Versus, with the mod loader built in.
 
-Double-click "Uma Versus Modded.bat" (or the desktop shortcut it makes). This:
-  1. updates the mod manager's own files from github.com/jaxonb423/umaversus-mods,
+Double-click "Uma Versus Desktop.exe" (or the desktop shortcut it makes). This:
+  1. updates the app's own files from github.com/jaxonb423/umaversus-mods,
   2. checks umaversus.lol for the current game and, when it changed, downloads it and builds
      the modded copy (sprites and music included; only changed files are downloaded again),
   3. opens the game in its own window, served from http://localhost:8777 on this computer only,
@@ -25,9 +25,10 @@ SITE = os.environ.get("UVM_SITE", "https://umaversus.lol").rstrip("/")
 REPO = os.environ.get("UVM_REPO", "https://raw.githubusercontent.com/jaxonb423/umaversus-mods/main").rstrip("/")
 PORT = int(os.environ.get("UVM_PORT", "8777"))
 KEEP = 2                     # game versions kept: the newest + the previous one (the fallback)
-LAUNCHER_FORMAT = 3          # bump when the way builds are made changes (forces a rebuild)
+LAUNCHER_FORMAT = 4          # bump when the way builds are made changes (forces a rebuild)
 NO_WINDOW = os.environ.get("UVM_NO_WINDOW") == "1"
-UA = {"User-Agent": "Mozilla/5.0 (Uma Versus mod launcher)"}
+APP_NAME = "Uma Versus Desktop"
+UA = {"User-Agent": "Mozilla/5.0 (Uma Versus Desktop)"}
 os.makedirs(BUILDS, exist_ok=True)
 
 # ---------------------------------------------------------------- logging (pythonw has no console)
@@ -59,7 +60,7 @@ def alert(msg):
     if os.name == "nt":
         try:
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, msg, "Uma Versus (Modded)", 0x10)
+            ctypes.windll.user32.MessageBoxW(None, msg, APP_NAME, 0x10)
             return
         except Exception:
             pass
@@ -126,7 +127,7 @@ def self_update():
             log("self-update: failed", rel, e)
     if changed:
         log("self-update: updated", ", ".join(changed), "->", man.get("version"))
-        STATUS["notes"].append("Mod manager updated to " + str(man.get("version")))
+        STATUS["notes"].append("App updated to " + str(man.get("version")))
     return "app/launcher.py" in changed
 
 
@@ -217,7 +218,7 @@ def make_page(page, bid):
     if m:
         game = game[:m.start()] + "const BUILD = '" + m.group(2) + "' + ((typeof UVM !== 'undefined' && UVM.tag) || '') /*uvm:build*/;" + game[m.end():]
     else:
-        notes.append("build tag not found: mods stay off on this version until the manager is updated")
+        notes.append("build tag not found: mods stay off on this version until the app is updated")
     ui = open(os.path.join(APP, "uvm_ui.js"), encoding="utf-8").read()
     bridge = open(os.path.join(APP, "uvm_bridge.js"), encoding="utf-8").read()
     loader = open(os.path.join(APP, "uvm_loader.js"), encoding="utf-8").read()
@@ -225,7 +226,6 @@ def make_page(page, bid):
     if "</script" in code.lower():
         raise RuntimeError("game code contains a closing script tag")
     out = (page[:s - len("<script>")] + '<script type="text/x-uv-game" id="uv-game">' + code + "</script>\n<script>\n" + loader + "\n</script>" + page[e + len("</script>"):])
-    out = out.replace("<title>", "<title>(Modded) ", 1)
     return out, notes
 
 
@@ -297,7 +297,7 @@ def update_game():
         log("new game version:", bid)
         prev = os.path.join(BUILDS, idx[0]["id"]) if idx else None
         tmp = download_build(page, bid, prev)
-        status(state="building", msg="Building the modded game", progress=1)
+        status(state="building", msg="Getting the game ready", progress=1)
         finish_build(tmp, bid, mv)
         final = os.path.join(BUILDS, bid)
         if os.path.exists(final):
@@ -306,7 +306,7 @@ def update_game():
         idx.insert(0, {"id": bid, "first_seen": time.strftime("%Y-%m-%d %H:%M")})
         if len(idx) > 1:
             STATUS["notes"].append(f"Game updated: {idx[1]['id']} -> {bid}")
-    # rebuild versions made by an older mod manager (no download needed), and fetch any file they lack
+    # rebuild versions made by an older version of the app (no download needed), and fetch any file they lack
     for b in idx[:KEEP]:
         d = os.path.join(BUILDS, b["id"])
         if not STATUS["offline"]:
@@ -334,7 +334,7 @@ def update_game():
         except Exception:
             meta = {}
         if meta.get("manager") != mv or not os.path.isfile(os.path.join(d, "index.html")):
-            status(state="building", msg=f"Updating game version {b['id']} for the new mod manager", progress=1)
+            status(state="building", msg=f"Updating game version {b['id']} for the app update", progress=1)
             finish_build(d, b["id"], mv)
     # keep the newest + one previous version
     for b in idx[KEEP:]:
@@ -484,24 +484,27 @@ def watchdog():
 
 # ---------------------------------------------------------------- 5. shortcuts (first start from the bundled Python)
 def make_shortcuts():
+    """Desktop + Start menu shortcuts. Also replaces the old "Uma Versus (Modded)" ones from before the rename."""
     if os.name != "nt":
         return
-    flag = os.path.join(DATA, "shortcuts.done")
+    flag = os.path.join(DATA, "shortcuts-desktop.done")
     pyw = os.path.join(ROOT, "runtime", "pythonw.exe")
-    exe = os.path.join(ROOT, "Uma Versus Modded.exe")
+    exe = next((p for p in (os.path.join(ROOT, n) for n in ("Uma Versus Desktop.exe", "Uma Versus Modded.exe")) if os.path.isfile(p)), None)
     if os.path.exists(flag) or not os.path.isfile(pyw):
         return
     q = lambda p: p.replace("'", "''")   # PowerShell single-quoted string
     icon = os.path.join(APP, "icon.ico")
+    lnk, old = APP_NAME + ".lnk", "Uma Versus (Modded).lnk"
     ps = []
-    for folder in ("[Environment]::GetFolderPath('Desktop')", "[Environment]::GetFolderPath('Programs')"):
+    for folder in ("([Environment]::GetFolderPath('Desktop'))", "([Environment]::GetFolderPath('Programs'))"):
         ps.append(
-            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path " + folder + " 'Uma Versus (Modded).lnk'));"
-            + (f"$s.TargetPath='{q(exe)}';$s.Arguments='';" if os.path.isfile(exe) else f"$s.TargetPath='{q(pyw)}';$s.Arguments='\"{q(os.path.join(APP, 'launcher.py'))}\"';") +
+            "Remove-Item -LiteralPath (Join-Path " + folder + " '" + old + "') -ErrorAction SilentlyContinue;"
+            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path " + folder + " '" + lnk + "'));"
+            + (f"$s.TargetPath='{q(exe)}';$s.Arguments='';" if exe else f"$s.TargetPath='{q(pyw)}';$s.Arguments='\"{q(os.path.join(APP, 'launcher.py'))}\"';") +
             f"$s.WorkingDirectory='{q(ROOT)}';"
-            f"$s.IconLocation='{q(icon)}';$s.Description='Uma Versus with mods';$s.Save();")
+            f"$s.IconLocation='{q(icon)}';$s.Description='Uma Versus desktop app (mod loader included)';$s.Save();")
     check = ("$d=[Environment]::GetFolderPath('Desktop');$p=[Environment]::GetFolderPath('Programs');"
-             "if ((Test-Path (Join-Path $d 'Uma Versus (Modded).lnk')) -and (Test-Path (Join-Path $p 'Uma Versus (Modded).lnk'))) { 'UVM-SHORTCUTS-OK' }")
+             "if ((Test-Path (Join-Path $d '" + lnk + "')) -and (Test-Path (Join-Path $p '" + lnk + "'))) { 'UVM-SHORTCUTS-OK' }")
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "".join(ps) + check],
                            creationflags=0x08000000, timeout=30, check=False, capture_output=True, text=True)
@@ -550,4 +553,4 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         log(traceback.format_exc())
-        alert("Uma Versus (Modded) couldn't start:\n" + str(e) + "\n\nDetails are in data\\launcher.log")
+        alert(APP_NAME + " couldn't start:\n" + str(e) + "\n\nDetails are in data\\launcher.log")

@@ -1,5 +1,5 @@
 @echo off
-rem Backup way to start Uma Versus (Modded), for when an antivirus blocks "Uma Versus Modded.exe".
+rem Backup way to start Uma Versus Desktop, for when an antivirus blocks "Uma Versus Desktop.exe".
 cd /d "%~dp0.."
 if not exist "%~dp0..\runtime\pythonw.exe" (
   echo.

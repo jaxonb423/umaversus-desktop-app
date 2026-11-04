@@ -130,7 +130,7 @@
   function applyMods(base, recs, state, makeUrls) {
     var code = base, running = [], errors = {};
     if (base.indexOf(BUILD_MARK) < 0) {   // the build tag keeps modded players apart online; without it, no mods
-      recs.forEach(function (r) { if (state.enabled[r.id]) errors[r.id] = "this game version couldn't be tagged as modded, so mods are off (wait for a manager update)"; });
+      recs.forEach(function (r) { if (state.enabled[r.id]) errors[r.id] = "this game version couldn't be tagged as modded, so mods are off (wait for an app update)"; });
       return { code: code, running: running, errors: errors };
     }
     recs.slice().sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; }).forEach(function (rec) {

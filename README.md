@@ -1,7 +1,10 @@
-# Uma Versus mods
+# Uma Versus Desktop
 
-A mod manager for [Uma Versus](https://umaversus.lol), plus the mod catalog it reads.
-It adds a **MODS** tab to the game: your mods as cards with a banner, tags and an on/off
+The desktop app for [Uma Versus](https://umaversus.lol), with a **mod loader included**.
+It plays the game in its own window, keeps it up to date by itself and works offline, and
+this repo also holds the mod catalog the app reads.
+
+The built-in mod loader adds a **MODS** tab to the game: your mods as cards with a banner, tags and an on/off
 switch, a search box (names, creators or `#tags`), **+ ADD MOD** to browse this catalog or
 install from a link, and **EDIT** for each mod's settings and updates.
 
@@ -15,10 +18,10 @@ normal room codes.
 
 1. Download this repo: green **Code** button → **Download ZIP**.
 2. Right-click the zip → **Extract All**.
-3. Open the folder and double-click **`Uma Versus Modded.exe`**.
+3. Open the folder and double-click **`Uma Versus Desktop.exe`**.
 
 That's it. Python comes bundled (in `runtime`), nothing gets installed. The first start
-downloads the game from umaversus.lol (about 55 MB), puts an **Uma Versus (Modded)**
+downloads the game from umaversus.lol (about 55 MB), puts an **Uma Versus Desktop**
 shortcut on your desktop and in the Start menu, and opens the game in its own window.
 From then on, use the shortcut. Closing the game window closes everything.
 
@@ -27,11 +30,14 @@ From then on, use the shortcut. Closing the game window closes everything.
   `app\start.bat` starts the same thing.
 - Mac/Linux: run `python3 app/launcher.py` from the folder (needs Python 3.8+).
 - Your mods and settings live in the `data` folder next to the app. Keep the folder where it is.
+- Had it from before, when it was called **Uma Versus (Modded)**? Nothing to do: on its next
+  start the app updates itself and swaps the old shortcuts for **Uma Versus Desktop** ones.
+  Your mods and settings stay. (The old `Uma Versus Modded.exe` in your folder keeps working.)
 
 ## When the game updates
 
 Every start, the app checks umaversus.lol. When the game changed, it downloads the new
-version (only the files that changed) and builds the modded copy, and it keeps the previous
+version (only the files that changed) and gets it ready, and it keeps the previous
 version too:
 
 - **Mods still work on the new version** (the usual case): you're on the new version.
@@ -39,7 +45,7 @@ version too:
   mods, and the start screen says so, until the mod gets an update. Mods update themselves.
 - **No internet:** you play the last downloaded version.
 
-The manager hooks into the game while it runs instead of editing fixed lines of its code, so
+The mod loader hooks into the game while it runs instead of editing fixed lines of its code, so
 game updates rarely touch it. If one ever does, MODS opens a simple panel instead (also
 **Ctrl+Shift+M**), and the app updates its own files from this repo at every start, so a
 fix pushed here reaches everyone on their next start.
@@ -67,7 +73,7 @@ shows why in red; the game starts without that mod.
 
 ## Modded online 1v1s
 
-1. Both players use the app with the **same mods**, with the **same settings**
+1. Both players use Uma Versus Desktop with the **same mods**, with the **same settings**
    (settings marked *both players must match* on the Edit screen). Mods update themselves,
    so after a mod update just restart both games.
 2. **Online** → make or join a room with a code, exactly as usual.
@@ -191,5 +197,5 @@ request. `tools/` also holds the scripts that generated the included mods.
 Fan project, not affiliated with Uma Versus, Cygames or Electoral Carnage. This repo does
 not contain the game: the app downloads it from umaversus.lol. `runtime/` is the official
 Windows embeddable Python 3.12.10 from python.org (PSF license, see `runtime/LICENSE.txt`).
-`Uma Versus Modded.exe` is a tiny starter for it, built from `tools/exe/` (`build_exe.sh`,
+`Uma Versus Desktop.exe` is a tiny starter for it, built from `tools/exe/` (`build_exe.sh`,
 needs `pip install ziglang`); all it does is run `runtime\pythonw.exe app\launcher.py`.
